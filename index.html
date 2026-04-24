@@ -175,16 +175,9 @@
   @media (prefers-color-scheme: dark) { .tax-badge { background: #1e3a5f; color: #60a5fa; } }
   .exch-note { font-size: 11px; color: var(--text3); padding: 10px 14px; border-top: 0.5px solid var(--border); }
 
-  .footer {
-    display: flex; align-items: center; justify-content: space-between;
-    flex-wrap: wrap; gap: 12px;
-    padding-top: 1.25rem; border-top: 0.5px solid var(--border);
-  }
-  .footer-note { font-size: 11px; color: var(--text3); line-height: 1.5; max-width: 440px; }
-
   @media print {
     body { background: white; }
-    .sync-bar, .footer .icon-btn { display: none !important; }
+    .sync-bar { display: none !important; }
     .page { padding: 1rem; }
   }
 </style>
@@ -296,31 +289,11 @@
     <div class="exch-note" id="exchNote"></div>
   </div>
 
-  <div class="footer">
-    <div class="footer-note">
-      Tax rates &amp; exchange rates sourced live from the dMore Google Sheet ·
-      <a href="https://docs.google.com/spreadsheets/d/1o1b5CowxQNHwcuy7x1q1QFSSNhXnNzDeIfCCXOH0RhY" target="_blank" style="color:var(--accent);text-decoration:none;">View sheet ↗</a>
-      · Not tax or legal advice.
-    </div>
-    <button class="icon-btn" onclick="window.print()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="6 9 6 2 18 2 18 9"/>
-        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-        <rect x="6" y="14" width="12" height="8"/>
-      </svg>
-      Print / PDF
-    </button>
-  </div>
-
 </div>
 <script>
-/* ─────────────────────────────────────────────
-   Sheet ID — the public dMore tax table
-   ───────────────────────────────────────────── */
 const SHEET_ID  = '1o1b5CowxQNHwcuy7x1q1QFSSNhXnNzDeIfCCXOH0RhY';
 const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
 
-/* Fallback used only if fetch fails */
 const FALLBACK = [
   { country_name:'Thailand',    country_code:'TH', currency:'THB', type:'VAT', description:'VAT Digital Services', percentage:7,  exchange_rate:32.3525  },
   { country_name:'Philippines', country_code:'PH', currency:'PHP', type:'VAT', description:'VAT Digital Services', percentage:12, exchange_rate:60.637   },
@@ -334,16 +307,13 @@ const FALLBACK = [
 let taxData     = [];
 let currentMode = 'excl';
 
-/* ── Helpers ── */
 function fmt(n, d=2) {
   return n.toLocaleString('en-US', { minimumFractionDigits:d, maximumFractionDigits:d });
 }
 function fmtPct(n)   { return n.toFixed(2) + '%'; }
 function fmtRatio(n) { return n.toFixed(4); }
 
-/* ── CSV parser ── */
 function parseNum(s) {
-  /* Handles both "7.00%" "7,00%" "3556,13592" "3556.13592" */
   return parseFloat(s.replace('%','').replace(',','.').trim());
 }
 
@@ -360,8 +330,6 @@ function splitCSVLine(line) {
 
 function parseCSV(text) {
   const lines = text.trim().split('\n');
-
-  /* Find header row */
   let hi = -1;
   for (let i = 0; i < Math.min(lines.length, 10); i++) {
     const l = lines[i].toLowerCase();
@@ -397,7 +365,6 @@ function parseCSV(text) {
   return results.length > 0 ? results : null;
 }
 
-/* ── Fetch from Google Sheets ── */
 async function syncFromSheet(isAuto = false) {
   const btn  = document.getElementById('syncBtn');
   const icon = document.getElementById('syncIcon');
@@ -408,23 +375,19 @@ async function syncFromSheet(isAuto = false) {
   icon.classList.add('spin'); btn.disabled = true;
   dot.className = 'sync-dot loading';
   err.style.display = 'none';
-  if (!isAuto) stat.textContent = 'Fetching data from Google Sheets...';
+  if (!isAuto) stat.textContent = 'Fetching data...';
 
   try {
     const resp = await fetch(SHEET_URL, { cache: 'no-cache' });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const parsed = parseCSV(await resp.text());
-    if (!parsed) throw new Error('Tax table not found. Make sure the sheet has headers: country_name, country_code, currency, type, description, percentage, exchange_rate.');
+    if (!parsed) throw new Error('Format error.');
 
     taxData = parsed;
     buildSelect();
     calculate();
     dot.className = 'sync-dot ok';
-    const hasRates = parsed.every(t => t.exchange_rate);
-    stat.textContent = 'Live from Google Sheets · '
-      + parsed.length + ' countries · '
-      + (hasRates ? 'exchange rates included · ' : '')
-      + 'Updated ' + new Date().toLocaleTimeString('en-US');
+    stat.textContent = 'Updated ' + new Date().toLocaleTimeString('en-US');
   } catch(e) {
     dot.className = 'sync-dot err';
     if (taxData.length === 0) {
@@ -432,15 +395,14 @@ async function syncFromSheet(isAuto = false) {
       buildSelect();
       calculate();
     }
-    stat.textContent = 'Using local fallback data (sheet unavailable)';
-    err.innerHTML = '<strong>Could not load sheet:</strong> ' + e.message;
+    stat.textContent = 'Using local data';
+    err.innerHTML = '<strong>Error:</strong> ' + e.message;
     err.style.display = 'block';
   } finally {
     icon.classList.remove('spin'); btn.disabled = false;
   }
 }
 
-/* ── Country select ── */
 function buildSelect() {
   const sel  = document.getElementById('countrySelect');
   const prev = sel.value;
@@ -454,7 +416,6 @@ function buildSelect() {
   if (prev && taxData.find(t => t.country_code === prev)) sel.value = prev;
 }
 
-/* ── Mode toggle ── */
 function setMode(mode) {
   currentMode = mode;
   document.getElementById('btnExcl').classList.toggle('active', mode === 'excl');
@@ -464,7 +425,6 @@ function setMode(mode) {
   calculate();
 }
 
-/* ── Core calculation ── */
 function calculate() {
   if (!taxData.length) return;
   const code    = document.getElementById('countrySelect').value;
@@ -475,16 +435,13 @@ function calculate() {
   const pspPct = parseFloat(document.getElementById('pspFee').value) / 100 || 0;
   const morPct = parseFloat(document.getElementById('morFee').value) / 100 || 0;
   const vatPct = country.percentage / 100;
-  const whtPct = 0;
-  /* Use exchange rate from sheet if available */
   const exRate = country.exchange_rate || 1;
 
-  let TPV, invoice, grossTake, vatAmt, whtAmt, pspAmt, morAmt, netTake;
+  let TPV, invoice, grossTake, vatAmt, pspAmt, morAmt, netTake;
 
   if (currentMode === 'excl') {
     grossTake = amount;
-    whtAmt    = grossTake * whtPct;
-    invoice   = whtPct < 1 ? grossTake / (1 - whtPct) : grossTake;
+    invoice   = grossTake;
     vatAmt    = invoice * vatPct;
     TPV       = invoice * (1 + vatPct);
     pspAmt    = TPV * pspPct;
@@ -494,8 +451,7 @@ function calculate() {
     TPV       = amount;
     vatAmt    = TPV / (1 + vatPct) * vatPct;
     invoice   = TPV - vatAmt;
-    whtAmt    = invoice * whtPct;
-    grossTake = invoice * (1 - whtPct);
+    grossTake = invoice;
     pspAmt    = TPV * pspPct;
     morAmt    = TPV * morPct;
     netTake   = grossTake - pspAmt - morAmt;
@@ -511,12 +467,11 @@ function calculate() {
   document.getElementById('currencyHead').textContent = country.currency;
   setMetric('mTPV',    TPV);
   setMetric('mInvoice',invoice);
-  setMetric('mTax',    vatAmt + whtAmt);
+  setMetric('mTax',    vatAmt);
   setMetric('mNet',    netTake);
 
   const rows = currentMode === 'excl' ? [
     { label:'Merchant Gross Take',       pct:'',                         local:grossTake, cls:'row-main' },
-    { label:'WHT income tax',            pct:fmtPct(whtPct*100),         local:whtAmt,    cls:'row-sub'  },
     { label:'Invoice / Taxable Base',    pct:'',                         local:invoice,   cls:'row-main' },
     { label:country.description,         pct:fmtPct(country.percentage), local:vatAmt,    cls:'row-sub vat' },
     { label:'TPV / Gross TX Collection', pct:'',                         local:TPV,       cls:'row-main' },
@@ -527,7 +482,6 @@ function calculate() {
     { label:'TPV / Gross TX Collection', pct:'',                         local:TPV,       cls:'row-main' },
     { label:country.description,         pct:fmtPct(country.percentage), local:vatAmt,    cls:'row-sub vat' },
     { label:'Invoice / Taxable Base',    pct:'',                         local:invoice,   cls:'row-main' },
-    { label:'WHT income tax',            pct:fmtPct(whtPct*100),         local:whtAmt,    cls:'row-sub'  },
     { label:'Merchant Gross Take',       pct:'',                         local:grossTake, cls:'row-main' },
     { label:'dLocal PSP Fee',            pct:fmtPct(pspPct*100),         local:pspAmt,    cls:'row-sub'  },
     { label:'MoR Fee',                   pct:fmtPct(morPct*100),         local:morAmt,    cls:'row-sub'  },
@@ -548,17 +502,15 @@ function calculate() {
   }).join('');
 
   document.getElementById('exchNote').textContent =
-    'Exchange rate from sheet: 1 USD = ' + fmt(exRate, 4) + ' ' + country.currency;
+    'Rate: 1 USD = ' + fmt(exRate, 4) + ' ' + country.currency;
 }
 
-/* ── Wire up ── */
 document.getElementById('syncBtn').addEventListener('click', () => syncFromSheet(false));
 document.getElementById('countrySelect').addEventListener('change', calculate);
 document.getElementById('amountInput').addEventListener('input', calculate);
 document.getElementById('pspFee').addEventListener('input', calculate);
 document.getElementById('morFee').addEventListener('input', calculate);
 
-/* Auto-load on open */
 syncFromSheet(true);
 </script>
 </body>
