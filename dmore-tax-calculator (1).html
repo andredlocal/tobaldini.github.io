@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>dMore — Tax Calculator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --surface2: #f0f0ed;
+    --border: rgba(0,0,0,0.09);
+    --border2: rgba(0,0,0,0.16);
+    --text: #1a1a1a;
+    --text2: #666666;
+    --text3: #999999;
+    --accent: #2d7ef7;
+    --green: #00a87c;
+    --danger: #d93025;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0d0d;
+      --surface: #1a1a1a;
+      --surface2: #222222;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text: #efefef;
+      --text2: #999999;
+      --text3: #555555;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  .page { max-width: 800px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  .header {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 0.5px solid var(--border2);
+  }
+  .logo-wrap {
+    background: #000; border-radius: var(--radius);
+    width: 46px; height: 46px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .header-title { font-size: 19px; font-weight: 600; color: var(--text); line-height: 1.2; }
+  .header-sub   { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+  .sync-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 0.5px solid var(--border2);
+    border-radius: var(--radius); padding: 10px 14px;
+    margin-bottom: 1.25rem; font-size: 13px; color: var(--text2);
+  }
+  #syncStatus { flex: 1; line-height: 1.4; }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); flex-shrink: 0; transition: background 0.3s; }
+  .sync-dot.ok      { background: var(--green); }
+  .sync-dot.err     { background: var(--danger); }
+  .sync-dot.loading { background: var(--accent); animation: pulse 1s infinite; }
+  @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .icon-btn {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 0.5px solid var(--border2);
+    border-radius: var(--radius); padding: 7px 12px;
+    font-size: 12px; color: var(--text); cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+    white-space: nowrap; font-family: inherit;
+  }
+  .icon-btn:hover    { background: var(--bg); }
+  .icon-btn:disabled { opacity: 0.45; cursor: default; }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-banner {
+    display: none; background: #fff5f5; border: 0.5px solid #fecaca;
+    color: var(--danger); font-size: 13px; padding: 10px 14px;
+    border-radius: var(--radius); margin-bottom: 1rem; line-height: 1.55;
+  }
+  @media (prefers-color-scheme: dark) { .error-banner { background: #2a1010; border-color: #6b2020; } }
+
+  .inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 1rem; }
+  @media (max-width: 520px) { .inputs-grid { grid-template-columns: 1fr; } }
+  .input-group { display: flex; flex-direction: column; gap: 6px; }
+  .input-group label {
+    font-size: 11px; font-weight: 600; color: var(--text3);
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .input-group select,
+  .input-group input[type="number"] {
+    width: 100%; padding: 10px 12px; font-size: 15px;
+    color: var(--text); background: var(--surface);
+    border: 0.5px solid var(--border2); border-radius: var(--radius);
+    outline: none; font-family: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    -webkit-appearance: none; appearance: none;
+  }
+  .input-group select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; padding-right: 32px;
+  }
+  .input-group select:focus,
+  .input-group input[type="number"]:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45,126,247,0.13);
+  }
+
+  .mode-row {
+    display: flex; gap: 6px; margin-bottom: 1rem;
+    background: var(--surface2); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 4px;
+  }
+  .mode-btn {
+    flex: 1; padding: 9px 10px; font-size: 13px; font-weight: 500;
+    border: none; border-radius: 6px; cursor: pointer;
+    background: transparent; color: var(--text2);
+    transition: all 0.15s; font-family: inherit; text-align: center;
+  }
+  .mode-btn.active { background: #000; color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+  @media (prefers-color-scheme: dark) { .mode-btn.active { background: var(--accent); } }
+
+  .fees-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 1.5rem; }
+  @media (max-width: 520px) { .fees-row { grid-template-columns: 1fr; } }
+
+  .metrics-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 1.5rem; }
+  @media (max-width: 620px) { .metrics-grid { grid-template-columns: repeat(2,1fr); } }
+  .metric-card {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 14px 14px 12px;
+  }
+  .metric-label { font-size: 10px; font-weight: 600; color: var(--text3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+  .metric-value { font-size: 18px; font-weight: 600; color: var(--text); line-height: 1.25; word-break: break-all; }
+  .metric-value.green { color: var(--green); }
+  .metric-value.blue  { color: var(--accent); }
+  .metric-value.red   { color: var(--danger); }
+  .metric-usd { font-size: 11px; color: var(--text3); margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+  .breakdown-card {
+    background: var(--surface); border: 0.5px solid var(--border2);
+    border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1.5rem;
+  }
+  .table-wrap { overflow-x: auto; }
+  table.bt { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 540px; }
+  table.bt thead th {
+    padding: 10px 14px; text-align: left;
+    font-size: 10px; font-weight: 600; color: var(--text3);
+    letter-spacing: 0.06em; text-transform: uppercase;
+    border-bottom: 0.5px solid var(--border2);
+    background: var(--surface2); white-space: nowrap;
+  }
+  table.bt thead th:not(:first-child) { text-align: right; }
+  table.bt tbody tr { border-bottom: 0.5px solid var(--border); }
+  table.bt tbody tr:last-child { border-bottom: none; }
+  table.bt tbody td { padding: 10px 14px; color: var(--text); vertical-align: middle; }
+  table.bt tbody td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row-main td:first-child { font-weight: 600; }
+  .row-sub td { color: var(--text2); font-size: 12.5px; }
+  .row-highlight { background: rgba(0,168,124,0.05); }
+  .row-highlight td:first-child { font-weight: 700; color: var(--green); }
+  .tax-badge {
+    display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 8px;
+    background: #dbeafe; color: #1d4ed8; margin-left: 6px;
+    vertical-align: middle; font-weight: 600;
+  }
+  @media (prefers-color-scheme: dark) { .tax-badge { background: #1e3a5f; color: #60a5fa; } }
+  .exch-note { font-size: 11px; color: var(--text3); padding: 10px 14px; border-top: 0.5px solid var(--border); }
+
+  .footer {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+    padding-top: 1.25rem; border-top: 0.5px solid var(--border);
+  }
+  .footer-note { font-size: 11px; color: var(--text3); line-height: 1.5; max-width: 440px; }
+
+  @media print {
+    body { background: white; }
+    .sync-bar, .footer .icon-btn { display: none !important; }
+    .page { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="logo-wrap">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="g" x1="4" y1="4" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#55aaff"/>
+            <stop offset="100%" stop-color="#1a5fd4"/>
+          </linearGradient>
+        </defs>
+        <rect x="2"   y="9.5" width="20" height="5" rx="2.2" fill="url(#g)"/>
+        <rect x="9.5" y="2"   width="5" height="20" rx="2.2" fill="url(#g)"/>
+      </svg>
+    </div>
+    <div>
+      <div class="header-title">dMore Tax Calculator</div>
+      <div class="header-sub">Merchant fee &amp; tax breakdown</div>
+    </div>
+  </div>
+
+  <div class="sync-bar">
+    <div class="sync-dot loading" id="syncDot"></div>
+    <span id="syncStatus">Loading rates from Google Sheets...</span>
+    <button class="icon-btn" id="syncBtn">
+      <svg id="syncIcon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/>
+        <path d="M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
+
+  <div class="error-banner" id="errorBanner"></div>
+
+  <div class="inputs-grid">
+    <div class="input-group">
+      <label>Country</label>
+      <select id="countrySelect"></select>
+    </div>
+    <div class="input-group">
+      <label id="amountLabel">Amount (excl. taxes)</label>
+      <input type="number" id="amountInput" value="200" min="0" step="1" />
+    </div>
+  </div>
+
+  <div class="mode-row">
+    <button class="mode-btn active" id="btnExcl" onclick="setMode('excl')">Amount excl. taxes</button>
+    <button class="mode-btn"        id="btnIncl" onclick="setMode('incl')">Amount incl. taxes (TPV)</button>
+  </div>
+
+  <div class="fees-row">
+    <div class="input-group">
+      <label>dLocal PSP Fee (%)</label>
+      <input type="number" id="pspFee" value="2" min="0" max="100" step="0.01" />
+    </div>
+    <div class="input-group">
+      <label>MoR Fee (%)</label>
+      <input type="number" id="morFee" value="3" min="0" max="100" step="0.01" />
+    </div>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-label">TPV / Gross TX</div>
+      <div class="metric-value blue" id="mTPV">—</div>
+      <div class="metric-usd" id="mTPV_usd"></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Invoice base</div>
+      <div class="metric-value" id="mInvoice">—</div>
+      <div class="metric-usd" id="mInvoice_usd"></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Total taxes</div>
+      <div class="metric-value red" id="mTax">—</div>
+      <div class="metric-usd" id="mTax_usd"></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Merchant net take</div>
+      <div class="metric-value green" id="mNet">—</div>
+      <div class="metric-usd" id="mNet_usd"></div>
+    </div>
+  </div>
+
+  <div class="breakdown-card">
+    <div class="table-wrap">
+      <table class="bt">
+        <thead>
+          <tr>
+            <th style="width:36%">Item</th>
+            <th>Rate</th>
+            <th>Local (<span id="currencyHead">—</span>)</th>
+            <th>USD</th>
+            <th>% of TPV</th>
+          </tr>
+        </thead>
+        <tbody id="breakdownBody">
+          <tr><td colspan="5" style="text-align:center;padding:28px;color:var(--text3)">Loading sheet data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="exch-note" id="exchNote"></div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-note">
+      Tax rates &amp; exchange rates sourced live from the dMore Google Sheet ·
+      <a href="https://docs.google.com/spreadsheets/d/1o1b5CowxQNHwcuy7x1q1QFSSNhXnNzDeIfCCXOH0RhY" target="_blank" style="color:var(--accent);text-decoration:none;">View sheet ↗</a>
+      · Not tax or legal advice.
+    </div>
+    <button class="icon-btn" onclick="window.print()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 6 2 18 2 18 9"/>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+        <rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      Print / PDF
+    </button>
+  </div>
+
+</div>
+<script>
+/* ─────────────────────────────────────────────
+   Sheet ID — the public dMore tax table
+   ───────────────────────────────────────────── */
+const SHEET_ID  = '1o1b5CowxQNHwcuy7x1q1QFSSNhXnNzDeIfCCXOH0RhY';
+const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
+
+/* Fallback used only if fetch fails */
+const FALLBACK = [
+  { country_name:'Thailand',    country_code:'TH', currency:'THB', type:'VAT', description:'VAT Digital Services', percentage:7,  exchange_rate:32.3525  },
+  { country_name:'Philippines', country_code:'PH', currency:'PHP', type:'VAT', description:'VAT Digital Services', percentage:12, exchange_rate:60.637   },
+  { country_name:'Colombia',    country_code:'CO', currency:'COP', type:'VAT', description:'VAT Digital Services', percentage:19, exchange_rate:3556.136 },
+  { country_name:'Malaysia',    country_code:'MY', currency:'MYR', type:'VAT', description:'Direct Service Tax',   percentage:8,  exchange_rate:3.965    },
+  { country_name:'Indonesia',   country_code:'ID', currency:'IDR', type:'VAT', description:'VAT Digital Services', percentage:12, exchange_rate:17231    },
+  { country_name:'India',       country_code:'IN', currency:'INR', type:'VAT', description:'GST',                  percentage:18, exchange_rate:94.1526  },
+  { country_name:'Mexico',      country_code:'MX', currency:'MXN', type:'VAT', description:'VAT Digital Services', percentage:16, exchange_rate:17.40969 },
+];
+
+let taxData     = [];
+let currentMode = 'excl';
+
+/* ── Helpers ── */
+function fmt(n, d=2) {
+  return n.toLocaleString('en-US', { minimumFractionDigits:d, maximumFractionDigits:d });
+}
+function fmtPct(n)   { return n.toFixed(2) + '%'; }
+function fmtRatio(n) { return n.toFixed(4); }
+
+/* ── CSV parser ── */
+function parseNum(s) {
+  /* Handles both "7.00%" "7,00%" "3556,13592" "3556.13592" */
+  return parseFloat(s.replace('%','').replace(',','.').trim());
+}
+
+function splitCSVLine(line) {
+  const cols = []; let cur = '', inQ = false;
+  for (const c of line) {
+    if (c === '"') inQ = !inQ;
+    else if (c === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+    else cur += c;
+  }
+  cols.push(cur.trim());
+  return cols.map(s => s.replace(/^"|"$/g, '').trim());
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+
+  /* Find header row */
+  let hi = -1;
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    const l = lines[i].toLowerCase();
+    if (l.includes('country') && l.includes('percentage')) { hi = i; break; }
+  }
+  if (hi === -1) return null;
+
+  const headers = splitCSVLine(lines[hi]).map(h =>
+    h.toLowerCase().replace(/[\s\-\/]+/g, '_')
+  );
+
+  const results = [];
+  for (let i = hi + 1; i < lines.length; i++) {
+    const row = splitCSVLine(lines[i]);
+    if (!row[0]) continue;
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = row[idx] || ''; });
+
+    const pct = parseNum(obj.percentage);
+    const exr = parseNum(obj.exchange_rate || obj.exchangerate || obj.exchange || '0');
+    if (isNaN(pct) || !obj.country_code) continue;
+
+    results.push({
+      country_name:  obj.country_name  || '',
+      country_code:  obj.country_code.toUpperCase(),
+      currency:      (obj.currency || '').toUpperCase(),
+      type:          obj.type || 'VAT',
+      description:   obj.description || 'VAT',
+      percentage:    pct,
+      exchange_rate: isNaN(exr) || exr === 0 ? null : exr,
+    });
+  }
+  return results.length > 0 ? results : null;
+}
+
+/* ── Fetch from Google Sheets ── */
+async function syncFromSheet(isAuto = false) {
+  const btn  = document.getElementById('syncBtn');
+  const icon = document.getElementById('syncIcon');
+  const err  = document.getElementById('errorBanner');
+  const dot  = document.getElementById('syncDot');
+  const stat = document.getElementById('syncStatus');
+
+  icon.classList.add('spin'); btn.disabled = true;
+  dot.className = 'sync-dot loading';
+  err.style.display = 'none';
+  if (!isAuto) stat.textContent = 'Fetching data from Google Sheets...';
+
+  try {
+    const resp = await fetch(SHEET_URL, { cache: 'no-cache' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const parsed = parseCSV(await resp.text());
+    if (!parsed) throw new Error('Tax table not found. Make sure the sheet has headers: country_name, country_code, currency, type, description, percentage, exchange_rate.');
+
+    taxData = parsed;
+    buildSelect();
+    calculate();
+    dot.className = 'sync-dot ok';
+    const hasRates = parsed.every(t => t.exchange_rate);
+    stat.textContent = 'Live from Google Sheets · '
+      + parsed.length + ' countries · '
+      + (hasRates ? 'exchange rates included · ' : '')
+      + 'Updated ' + new Date().toLocaleTimeString('en-US');
+  } catch(e) {
+    dot.className = 'sync-dot err';
+    if (taxData.length === 0) {
+      taxData = [...FALLBACK];
+      buildSelect();
+      calculate();
+    }
+    stat.textContent = 'Using local fallback data (sheet unavailable)';
+    err.innerHTML = '<strong>Could not load sheet:</strong> ' + e.message;
+    err.style.display = 'block';
+  } finally {
+    icon.classList.remove('spin'); btn.disabled = false;
+  }
+}
+
+/* ── Country select ── */
+function buildSelect() {
+  const sel  = document.getElementById('countrySelect');
+  const prev = sel.value;
+  sel.innerHTML = '';
+  taxData.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.country_code;
+    o.textContent = t.country_name + ' (' + t.currency + ')';
+    sel.appendChild(o);
+  });
+  if (prev && taxData.find(t => t.country_code === prev)) sel.value = prev;
+}
+
+/* ── Mode toggle ── */
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('btnExcl').classList.toggle('active', mode === 'excl');
+  document.getElementById('btnIncl').classList.toggle('active', mode === 'incl');
+  document.getElementById('amountLabel').textContent =
+    mode === 'excl' ? 'Amount (excl. taxes)' : 'Amount incl. taxes (TPV)';
+  calculate();
+}
+
+/* ── Core calculation ── */
+function calculate() {
+  if (!taxData.length) return;
+  const code    = document.getElementById('countrySelect').value;
+  const country = taxData.find(t => t.country_code === code);
+  if (!country) return;
+
+  const amount = parseFloat(document.getElementById('amountInput').value) || 0;
+  const pspPct = parseFloat(document.getElementById('pspFee').value) / 100 || 0;
+  const morPct = parseFloat(document.getElementById('morFee').value) / 100 || 0;
+  const vatPct = country.percentage / 100;
+  const whtPct = 0;
+  /* Use exchange rate from sheet if available */
+  const exRate = country.exchange_rate || 1;
+
+  let TPV, invoice, grossTake, vatAmt, whtAmt, pspAmt, morAmt, netTake;
+
+  if (currentMode === 'excl') {
+    grossTake = amount;
+    whtAmt    = grossTake * whtPct;
+    invoice   = whtPct < 1 ? grossTake / (1 - whtPct) : grossTake;
+    vatAmt    = invoice * vatPct;
+    TPV       = invoice * (1 + vatPct);
+    pspAmt    = TPV * pspPct;
+    morAmt    = TPV * morPct;
+    netTake   = grossTake - pspAmt - morAmt;
+  } else {
+    TPV       = amount;
+    vatAmt    = TPV / (1 + vatPct) * vatPct;
+    invoice   = TPV - vatAmt;
+    whtAmt    = invoice * whtPct;
+    grossTake = invoice * (1 - whtPct);
+    pspAmt    = TPV * pspPct;
+    morAmt    = TPV * morPct;
+    netTake   = grossTake - pspAmt - morAmt;
+  }
+
+  const toUSD = v => v / exRate;
+  const tpvR  = v => TPV > 0 ? v / TPV : 0;
+
+  const setMetric = (id, val) => {
+    document.getElementById(id).textContent          = country.currency + ' ' + fmt(val);
+    document.getElementById(id + '_usd').textContent = '≈ USD ' + fmt(toUSD(val));
+  };
+  document.getElementById('currencyHead').textContent = country.currency;
+  setMetric('mTPV',    TPV);
+  setMetric('mInvoice',invoice);
+  setMetric('mTax',    vatAmt + whtAmt);
+  setMetric('mNet',    netTake);
+
+  const rows = currentMode === 'excl' ? [
+    { label:'Merchant Gross Take',       pct:'',                         local:grossTake, cls:'row-main' },
+    { label:'WHT income tax',            pct:fmtPct(whtPct*100),         local:whtAmt,    cls:'row-sub'  },
+    { label:'Invoice / Taxable Base',    pct:'',                         local:invoice,   cls:'row-main' },
+    { label:country.description,         pct:fmtPct(country.percentage), local:vatAmt,    cls:'row-sub vat' },
+    { label:'TPV / Gross TX Collection', pct:'',                         local:TPV,       cls:'row-main' },
+    { label:'dLocal PSP Fee',            pct:fmtPct(pspPct*100),         local:pspAmt,    cls:'row-sub'  },
+    { label:'MoR Fee',                   pct:fmtPct(morPct*100),         local:morAmt,    cls:'row-sub'  },
+    { label:'Merchant Net Take',         pct:'',                         local:netTake,   cls:'row-highlight' },
+  ] : [
+    { label:'TPV / Gross TX Collection', pct:'',                         local:TPV,       cls:'row-main' },
+    { label:country.description,         pct:fmtPct(country.percentage), local:vatAmt,    cls:'row-sub vat' },
+    { label:'Invoice / Taxable Base',    pct:'',                         local:invoice,   cls:'row-main' },
+    { label:'WHT income tax',            pct:fmtPct(whtPct*100),         local:whtAmt,    cls:'row-sub'  },
+    { label:'Merchant Gross Take',       pct:'',                         local:grossTake, cls:'row-main' },
+    { label:'dLocal PSP Fee',            pct:fmtPct(pspPct*100),         local:pspAmt,    cls:'row-sub'  },
+    { label:'MoR Fee',                   pct:fmtPct(morPct*100),         local:morAmt,    cls:'row-sub'  },
+    { label:'Merchant Net Take',         pct:'',                         local:netTake,   cls:'row-highlight' },
+  ];
+
+  document.getElementById('breakdownBody').innerHTML = rows.map(r => {
+    const isVat    = r.cls.includes('vat');
+    const lbl      = r.label + (isVat ? '<span class="tax-badge">' + country.type + '</span>' : '');
+    const showTpv  = r.pct || r.label.includes('Net Take') || r.label.includes('TPV') || r.label.includes('Invoice') || r.label.includes('Gross Take');
+    return `<tr class="${r.cls}">
+      <td>${lbl}</td>
+      <td>${r.pct || '—'}</td>
+      <td>${country.currency + ' ' + fmt(r.local)}</td>
+      <td style="color:var(--text2)">USD ${fmt(toUSD(r.local))}</td>
+      <td style="color:var(--text3)">${showTpv ? fmtRatio(tpvR(r.local)) : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('exchNote').textContent =
+    'Exchange rate from sheet: 1 USD = ' + fmt(exRate, 4) + ' ' + country.currency;
+}
+
+/* ── Wire up ── */
+document.getElementById('syncBtn').addEventListener('click', () => syncFromSheet(false));
+document.getElementById('countrySelect').addEventListener('change', calculate);
+document.getElementById('amountInput').addEventListener('input', calculate);
+document.getElementById('pspFee').addEventListener('input', calculate);
+document.getElementById('morFee').addEventListener('input', calculate);
+
+/* Auto-load on open */
+syncFromSheet(true);
+</script>
+</body>
+</html>
